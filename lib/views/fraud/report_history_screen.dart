@@ -5,9 +5,6 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../core/constants/app_strings.dart';
-import '../../core/constants/app_colors.dart';
 import '../../data/models/fraud_report_model.dart';
 import '../../data/repositories/fraud_repository.dart';
 import '../../core/services/firestore_service.dart';

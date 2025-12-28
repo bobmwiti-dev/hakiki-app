@@ -5,8 +5,6 @@
 library;
 
 import 'package:flutter/material.dart';
-import '../../core/constants/app_strings.dart';
-import '../../core/constants/app_colors.dart';
 import '../../data/models/user_model.dart';
 import '../../data/repositories/user_repository.dart';
 import '../../core/services/firestore_service.dart';
