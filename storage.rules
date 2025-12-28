@@ -1,0 +1,93 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    function isValidImageFile() {
+      return request.resource.contentType.matches('image/.*') &&
+        request.resource.size < 10 * 1024 * 1024; // 10MB limit
+    }
+    
+    function isValidDocumentFile() {
+      return (request.resource.contentType.matches('image/.*') ||
+              request.resource.contentType.matches('application/pdf') ||
+              request.resource.contentType.matches('application/msword') ||
+              request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) &&
+        request.resource.size < 20 * 1024 * 1024; // 20MB limit for documents
+    }
+    
+    // User profile images - users can upload their own profile images
+    match /users/{userId}/profile/{fileName} {
+      allow read: if true; // Public read access for profile images
+      allow write: if isOwner(userId) && isValidImageFile();
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+    
+    // Product images - vendors can upload product images
+    match /products/{productId}/images/{fileName} {
+      allow read: if true; // Public read access for product images
+      allow write: if isAuthenticated() && isValidImageFile();
+      allow delete: if isAdmin() || 
+        (isAuthenticated() && 
+         firestore.get(/databases/(default)/documents/products/$(productId)).data.vendorId == request.auth.uid);
+    }
+    
+    // Vendor documents - vendors can upload their verification documents
+    match /vendors/{vendorId}/documents/{fileName} {
+      allow read: if isOwner(vendorId) || isAdmin();
+      allow write: if isOwner(vendorId) && isValidDocumentFile();
+      allow delete: if isOwner(vendorId) || isAdmin();
+    }
+    
+    // Vendor profile images and logos
+    match /vendors/{vendorId}/images/{fileName} {
+      allow read: if true; // Public read access for vendor images
+      allow write: if isOwner(vendorId) && isValidImageFile();
+      allow delete: if isOwner(vendorId) || isAdmin();
+    }
+    
+    // Fraud report evidence - users can upload evidence for their reports
+    match /fraud_reports/{reportId}/evidence/{fileName} {
+      allow read: if isAdmin() || 
+        (isAuthenticated() && 
+         firestore.get(/databases/(default)/documents/fraud_reports/$(reportId)).data.reporterId == request.auth.uid);
+      allow write: if isAuthenticated() && 
+        (isValidImageFile() || isValidDocumentFile());
+      allow delete: if isAdmin();
+    }
+    
+    // Report attachments - similar to fraud reports
+    match /reports/{reportId}/attachments/{fileName} {
+      allow read: if isAdmin() || 
+        (isAuthenticated() && 
+         firestore.get(/databases/(default)/documents/reports/$(reportId)).data.reporterId == request.auth.uid);
+      allow write: if isAuthenticated() && 
+        (isValidImageFile() || isValidDocumentFile());
+      allow delete: if isAdmin();
+    }
+    
+    // System files - admin only
+    match /system/{allPaths=**} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Temporary uploads - authenticated users can upload temporarily
+    match /temp/{userId}/{fileName} {
+      allow read, write: if isOwner(userId);
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+  }
+}
